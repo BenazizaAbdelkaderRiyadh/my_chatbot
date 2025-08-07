@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectPro | Your Project Management Assistant</title>
+  <link rel="icon" href="{{ url_for('static', filename='docai.png') }}" type="image/png"> <!-- You may want to change this icon -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-blue: #2A5C99;
+      --primary-blue-hover: #1E4A7E;
+      --primary-blue-light: #4A90E2;
+      --primary-green: #4CAF50;
+      --bg-overlay: rgba(42, 92, 153, 0.7);
+      --sidebar-bg: #1A3A6B;
+      --white: #ffffff;
+      --text-color: #333333;
+      --text-muted: #6C757D;
+      --accent-color: #ff9a9e; /* Using a mild accent color */
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+    body {
+      background: url('{{ url_for("static", filename="back.jpg") }}') no-repeat fixed center/cover;
+      color: var(--text-color);
+      display: flex;
+      min-height: 100vh;
+    }
+    .sidebar { width: 60px; background: var(--sidebar-bg); position: fixed; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 10; }
+    .sidebar img { margin-top: 5px; height: 50px; width: 50px; filter: brightness(0) invert(1); opacity: 0.9; transition: opacity 0.3s ease; }
+    .sidebar img:hover { opacity: 1; }
+    .main-content { margin-left: 60px; flex-grow: 1; background: var(--bg-overlay); }
+    .navbar { position: absolute; top: 0; left: 60px; width: calc(100% - 60px); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+    .logo h2 { color: var(--white); }
+    .accent-text { color: var(--accent-color); }
+    .menu a { display: block; padding: 10px 20px; color: var(--white); background-color: rgba(255, 255, 255, 0.1); text-decoration: none; font-weight: 500; font-size: 16px; border-radius: 6px; transition: all 0.3s ease; }
+    .menu a:hover { background-color: rgba(255, 255, 255, 0.2); transform: translateY(-1px); }
+    .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 20px; position: relative; }
+    .hero-content { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .hero h1 { font-size: 2.5rem; color: var(--white); margin-bottom: 1rem; }
+    .hero p { font-size: 1.1rem; margin-bottom: 1.5rem; max-width: 600px; color: var(--white); }
+    .buttons { display: flex; gap: 10px; }
+    .btn { padding: 12px 25px; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; text-decoration: none; }
+    .btn-primary { background-color: var(--primary-blue); color: var(--white); }
+    .btn-primary:hover { background-color: var(--primary-blue-hover); }
+    .btn-secondary { background-color: var(--white); color: var(--primary-blue); }
+    #icons { display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; }
+    #icons i { color: var(--white); font-size: 1rem; margin: 8px 0; transition: color 0.3s ease; }
+    #icons i:hover { color: var(--primary-blue-light); }
+    .feature-cards { display: flex; gap: 25px; justify-content: center; padding: 20px; flex-wrap: wrap; }
+    .feature-card { flex: 1; min-width: 280px; background: white; border-radius: 16px; padding: 30px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); transition: all 0.4s ease; text-align: center; border-top: 4px solid; cursor: pointer; }
+    .link { text-decoration: none; color: inherit; display: block; height: 100%; }
+    .feature-card:hover { transform: translateY(-10px); box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12); }
+    .feature-icon { font-size: 2.5rem; margin-bottom: 20px; transition: transform 0.3s ease; }
+    .feature-card:hover .feature-icon { transform: scale(1.1); }
+    .feature-card h3 { font-size: 1.4rem; margin-bottom: 15px; color: #2b3a4a; }
+    .feature-card p { color: #6c7a89; line-height: 1.6; font-size: 1rem; }
+    .chat { border-color: #6e8efb; color: #6e8efb; }
+    .tasks { border-color: #4ac29a; color: #4ac29a; }
+    .analytics { border-color: #ff9a9e; color: #ff9a9e; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <a href="/"><img src="{{ url_for('static', filename='docai.png') }}" alt="ProjectPro Logo" /></a>
+    <div id="icons">
+      <!-- Generic/Placeholder Icons -->
+      <a href="#"><i class="fa-brands fa-github"></i></a>
+      <a href="#"><i class="fa-solid fa-globe"></i></a>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="hero">
+      <div class="navbar">
+        <div class="logo">
+          <h2>Project<span class="accent-text">Pro</span></h2>
+        </div>
+        {% if logged_in %}
+        <div class="menu">
+          <a href="/logout">Logout</a>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if logged_in %}
+      <div class="hero-content">
+        <h1>Welcome back, {{ session['user_name'] }}!</h1>
+        <p>Your AI-powered assistant for managing projects effectively.</p>
+
+        <div class="feature-cards">
+          <a href="{{ url_for('main.pm_chat') }}" class="link">
+            <div class="feature-card chat">
+              <div class="feature-icon">🤖</div>
+              <h3>AI Chat Assistant</h3>
+              <p>Get instant help with planning, tasks, and project strategies.</p>
+            </div>
+          </a>
+          <a href="#" class="link"> <!-- Placeholder Link -->
+            <div class="feature-card tasks">
+              <div class="feature-icon">📋</div>
+              <h3>Task Management</h3>
+              <p>Organize, assign, and track your project tasks (coming soon).</p>
+            </div>
+          </a>
+          <a href="#" class="link"> <!-- Placeholder Link -->
+            <div class="feature-card analytics">
+              <div class="feature-icon">📊</div>
+              <h3>Team Analytics</h3>
+              <p>View insights on team productivity and project progress (coming soon).</p>
+            </div>
+          </a>
+        </div>
+      </div>
+      {% else %}
+      <div class="hero-content">
+        <h1>Welcome to <span class="accent-text">ProjectPro</span></h1>
+        <p>Streamline your workflow with an intelligent project management assistant. Get instant guidance on tasks, planning, and team collaboration to deliver projects faster.</p>
+        <div class="buttons">
+          <a href="/register" class="btn btn-primary">Get Started</a>
+          <a href="/login" class="btn btn-secondary">Login</a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
