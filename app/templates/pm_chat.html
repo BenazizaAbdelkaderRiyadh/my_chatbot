@@ -18,8 +18,13 @@
     :root {
       --primary-color: #4A90E2;
       --primary-dark: #357ABD;
+      --secondary-color: #5cb85c; /* Green for upload */
+      --secondary-dark: #4cae4c;
+      --tertiary-color: #f0ad4e; /* Orange for history */
+      --tertiary-dark: #ec971f;
       --user-msg-bg: #4A90E2;
       --bot-msg-bg: rgba(255, 255, 255, 0.7);
+      --info-msg-bg: rgba(232, 245, 233, 0.9); /* Light green for info */
       --text-color: #333;
       --light-text: #f0f4f8;
       --container-bg: rgba(255, 255, 255, 0.5);
@@ -65,10 +70,20 @@
       font-weight: 600;
       padding: 18px;
       display: flex;
-      justify-content: center;
+      justify-content: space-between; /* MODIFICATION */
       align-items: center;
       gap: 12px;
       border-bottom: 1px solid var(--border-color);
+      position: relative;
+    }
+    
+    .header-title { /* MODIFICATION */
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
     }
 
     .chat-header i {
@@ -85,7 +100,6 @@
       scroll-behavior: smooth;
     }
 
-    /* Custom scrollbar for a cleaner look */
     .chat-messages::-webkit-scrollbar {
       width: 6px;
     }
@@ -116,24 +130,28 @@
       align-self: flex-start;
       border-bottom-left-radius: 5px;
     }
+
+    .message.info-message {
+        background: var(--info-msg-bg);
+        color: var(--secondary-dark);
+        align-self: center;
+        max-width: 90%;
+        text-align: center;
+        font-size: 0.9rem;
+        font-style: italic;
+    }
     
-    /* Styles for rendered Markdown from the bot */
     .bot-message h1, .bot-message h2, .bot-message h3,
     .bot-message strong {
         color: #2c3e50;
     }
-
     .bot-message ul, .bot-message ol {
-        padding-left: 20px;
-        margin-top: 5px;
+        padding-left: 20px; margin-top: 5px;
     }
-
     .bot-message p {
         margin-bottom: 8px;
     }
-    .bot-message p:last-child {
-        margin-bottom: 0;
-    }
+    .bot-message p:last-child { margin-bottom: 0; }
 
     .chat-input-area {
       padding: 15px 20px;
@@ -151,9 +169,9 @@
       flex: 1;
       padding: 14px 18px;
       font-size: 1rem;
-      border: 1px solid transparent;
+      border: 1px solid transparent;  
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.8);
+      background: rgb(250, 250, 250);
       outline: none;
       transition: all 0.3s ease;
       color: var(--text-color);
@@ -164,12 +182,11 @@
       box-shadow: 0 0 0 3px hsla(212, 72%, 62%, 0.3);
     }
 
-    .send-button {
+    .action-button {
       padding: 12px;
       width: 48px;
       height: 48px;
       font-size: 1.5rem;
-      background: var(--primary-color);
       color: #fff;
       border: none;
       border-radius: 50%;
@@ -180,12 +197,38 @@
       transition: background-color 0.3s, transform 0.2s ease;
     }
 
+    .send-button {
+      background: var(--primary-color);
+    }
     .send-button:hover {
       background: var(--primary-dark);
       transform: scale(1.05);
     }
 
-    /* Loading spinner */
+    .upload-button {
+      background: var(--secondary-color);
+    }
+    .upload-button:hover {
+      background: var(--secondary-dark);
+      transform: scale(1.05);
+    }
+    
+    /* MODIFICATION: Styles for the history button */
+    .history-button {
+        background: none;
+        border: 1px solid var(--tertiary-color);
+        color: var(--tertiary-color);
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .history-button:hover {
+        background: var(--tertiary-color);
+        color: white;
+    }
+
     .loading-spinner {
         align-self: flex-start;
         display: flex;
@@ -201,6 +244,56 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
+    
+    /* MODIFICATION: Styles for the history modal */
+    .history-modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.6);
+        animation: fadeIn 0.3s;
+    }
+
+    .history-modal-content {
+        background-color: #fefefe;
+        margin: 10% auto;
+        padding: 25px;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 700px;
+        border-radius: 15px;
+        position: relative;
+    }
+
+    .history-modal-close {
+        color: #aaa;
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .history-modal-close:hover {
+        color: black;
+    }
+    
+    #history-display {
+        background-color: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        max-height: 60vh;
+        overflow-y: auto;
+        white-space: pre-wrap; /* Allows wrapping */
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
 
     @keyframes spin {
         to { transform: rotate(360deg); }
@@ -215,24 +308,51 @@
 <body>
   <div class="chat-container">
     <header class="chat-header">
-      <i class='bx bxs-bot'></i>
-      <span>ProjectPro Assistant</span>
+      <!-- MODIFICATION: Button to open history modal -->
+      <button id="review-history-button" class="history-button">
+          Review History
+      </button>
+
+      <div class="header-title">
+        <i class='bx bxs-bot'></i>
+        <span>ProjectPro Assistant</span>
+      </div>
+      
+      <!-- A spacer to balance the header -->
+      <div style="width: 105px;"></div> 
     </header>
 
     <main class="chat-messages" id="chat-box" data-history="{{ conversation_history|tojson|e }}">
       <div class="message bot-message">
-        <p>👋 Hello! I'm ProjectPro. Ask me anything about managing your projects.</p>
+        <p>👋 Hello! I'm ProjectPro. Ask me anything about managing your projects. You can also upload a PDF to add it to my knowledge base.</p>
       </div>
     </main>
 
     <footer class="chat-input-area">
       <form class="chat-input-form" id="chat-form">
+        <input type="file" id="pdf-upload-input" accept=".pdf" style="display: none;">
+        
+        <button type="button" id="upload-pdf-button" class="action-button upload-button" aria-label="Upload PDF">
+          <i class='bx bxs-file-plus'></i>
+        </button>
+
         <input type="text" id="message-input" placeholder="Ask about risks, tasks, or plans..." autocomplete="off" required>
-        <button type="submit" class="send-button" aria-label="Send Message">
+        
+        <button type="submit" class="action-button send-button" aria-label="Send Message">
           <i class='bx bxs-paper-plane'></i>
         </button>
       </form>
     </footer>
+  </div>
+  
+  <!-- MODIFICATION: History Modal Structure -->
+  <div id="history-modal" class="history-modal">
+    <div class="history-modal-content">
+      <span class="history-modal-close" id="history-modal-close">&times;</span>
+      <h2>Conversation History</h2>
+      <br>
+      <pre id="history-display">Loading history...</pre>
+    </div>
   </div>
 
   <script>
@@ -240,25 +360,27 @@
       const chatForm = document.getElementById("chat-form");
       const messageInput = document.getElementById("message-input");
       const chatBox = document.getElementById("chat-box");
+      const uploadPdfButton = document.getElementById("upload-pdf-button");
+      const pdfUploadInput = document.getElementById("pdf-upload-input");
+      
+      // <!-- MODIFICATION: Get references to history modal elements -->
+      const historyModal = document.getElementById("history-modal");
+      const reviewHistoryButton = document.getElementById("review-history-button");
+      const historyDisplay = document.getElementById("history-display");
+      const historyModalClose = document.getElementById("history-modal-close");
 
       const scrollToBottom = () => {
         chatBox.scrollTop = chatBox.scrollHeight;
       };
 
-      /**
-       * Appends a message to the chat box.
-       * @param {string} role - 'user' or 'ai'.
-       * @param {string} text - The message content.
-       */
       function appendMessage(role, text) {
         const div = document.createElement("div");
-        div.classList.add("message", role === "user" ? "user-message" : "bot-message");
+        const roleClass = role === "user" ? "user-message" : (role === "ai" ? "bot-message" : "info-message");
+        div.classList.add("message", roleClass);
 
-        if (role === 'ai') {
-          // IMPORTANT: Render Markdown for AI responses
+        if (role === 'ai' || role === 'info') {
           div.innerHTML = marked.parse(text);
         } else {
-          // For user messages, just set text content to prevent XSS
           div.textContent = text;
         }
 
@@ -266,25 +388,21 @@
         scrollToBottom();
       }
 
-      // Load conversation history from the server-rendered data attribute
+      // Load conversation history from data attribute
       try {
         const historyData = chatBox.dataset.history;
         if (historyData) {
           const history = JSON.parse(historyData);
           if (Array.isArray(history) && history.length > 0) {
-            // Clear the welcome message if history exists
             chatBox.innerHTML = ''; 
-            history.forEach(msg => {
-              appendMessage(msg.role, msg.content);
-            });
+            history.forEach(msg => appendMessage(msg.role, msg.content));
           }
         }
       } catch (e) {
         console.error("Could not parse chat history:", e);
-        appendMessage("ai", "⚠️ Error: Could not load previous messages.");
       }
 
-      // --- Form Submission Handler ---
+      // --- Chat Form Submission Handler ---
       chatForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const userMessage = messageInput.value.trim();
@@ -294,7 +412,6 @@
         messageInput.value = "";
         messageInput.focus();
 
-        // Show loading spinner
         const loadingIndicator = document.createElement("div");
         loadingIndicator.className = "loading-spinner";
         loadingIndicator.innerHTML = `<div class="spinner"></div><span>ProjectPro is thinking...</span>`;
@@ -307,24 +424,91 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: userMessage })
           });
-
-          // Remove spinner regardless of outcome
           chatBox.removeChild(loadingIndicator);
-
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
           }
-          
           const data = await response.json();
           appendMessage("ai", data.response || "Sorry, I seem to have lost my train of thought.");
-          
         } catch (error) {
-          if (loadingIndicator.parentNode) {
+          if (loadingIndicator && loadingIndicator.parentNode) {
             chatBox.removeChild(loadingIndicator);
           }
           appendMessage("ai", `⚠️ **Connection Error**\n\nI couldn't reach my brain. Please check your internet connection and try again.`);
           console.error("Fetch Error:", error);
+        }
+      });
+      
+      // --- PDF Upload Logic ---
+      uploadPdfButton.addEventListener("click", () => {
+        pdfUploadInput.click();
+      });
+
+      pdfUploadInput.addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        appendMessage("info", `Uploading **${file.name}**...`);
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("{{ url_for('main.upload_pdf') }}", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || `Upload failed with status ${response.status}`);
+          }
+          
+          appendMessage("info", `✅ **Success!** The document **"${result.filename}"** has been added to my knowledge base.`);
+
+        } catch (error) {
+          appendMessage("info", `❌ **Upload Failed:** ${error.message}`);
+          console.error("Upload Error:", error);
+        } finally {
+          event.target.value = null;
+        }
+      });
+      
+      // <!-- MODIFICATION: History Modal Logic -->
+      
+      // Open the modal and fetch history
+      reviewHistoryButton.addEventListener("click", async () => {
+        historyDisplay.textContent = "Loading history...";
+        historyModal.style.display = "block";
+        
+        try {
+            const response = await fetch("{{ url_for('main.get_history') }}");
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to fetch history.");
+            }
+            
+            // Format the JSON nicely and display it
+            historyDisplay.textContent = JSON.stringify(data, null, 2);
+
+        } catch (error) {
+            historyDisplay.textContent = `Error: ${error.message}`;
+            console.error("History fetch error:", error);
+        }
+      });
+      
+      // Close the modal with the 'x' button
+      historyModalClose.addEventListener("click", () => {
+        historyModal.style.display = "none";
+      });
+      
+      // Close the modal by clicking outside the content area
+      window.addEventListener("click", (event) => {
+        if (event.target == historyModal) {
+          historyModal.style.display = "none";
         }
       });
       
