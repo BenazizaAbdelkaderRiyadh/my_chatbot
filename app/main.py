@@ -6,18 +6,27 @@ from datetime import datetime
 import re
 import os
 import fitz  # PyMuPDF
-from sklearn.feature_extraction.text import TfidfVectorizer
+# --- MODIFIED ---: We no longer need TfidfVectorizer, but we still use cosine_similarity
 from sklearn.metrics.pairwise import cosine_similarity
 import json
+from sentence_transformers import SentenceTransformer
+import numpy as np
 
 main_bp = Blueprint('main', __name__)
 
-# --- ✨ 1. PDF Processing and Knowledge Base Setup ---
-
-# --- Global variables for the dynamic knowledge base ---
 KNOWLEDGE_CORPUS = ""
 KNOWLEDGE_CHUNKS = []
-TFIDF_VECTORIZER = TfidfVectorizer()
+EMBEDDING_MODEL = None # Will hold the loaded sentence-transformer model
+KNOWLEDGE_EMBEDDINGS = None # Will hold the numerical vectors (embeddings) of the chunks
+
+# --- NEW ---: Load the powerful sentence-transformer model when the app starts.
+# 'all-MiniLM-L6-v2' is a great general-purpose model: fast and effective.
+try:
+    EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+    print("✅ Embedding model loaded successfully.")
+except Exception as e:
+    print(f"❌ Error loading embedding model: {e}")
+
 
 def extract_text_from_pdf(pdf_path):
     """Extracts text from a single PDF file."""
@@ -35,23 +44,25 @@ def chunk_text(text, chunk_size=500):
     words = text.split()
     return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
 
+# --- MODIFIED: This function now generates embeddings instead of fitting TF-IDF ---
 def update_knowledge_base(new_text=""):
     """
-    Updates the global knowledge base with new text, re-chunks, and re-fits the vectorizer.
+    Updates the global knowledge base with new text, re-chunks, and generates new embeddings.
     """
-    global KNOWLEDGE_CORPUS, KNOWLEDGE_CHUNKS, TFIDF_VECTORIZER
+    global KNOWLEDGE_CORPUS, KNOWLEDGE_CHUNKS, KNOWLEDGE_EMBEDDINGS, EMBEDDING_MODEL
     
     if new_text:
         KNOWLEDGE_CORPUS += "\n" + new_text
         
     KNOWLEDGE_CHUNKS = chunk_text(KNOWLEDGE_CORPUS)
     
-    if KNOWLEDGE_CHUNKS:
-        TFIDF_VECTORIZER = TfidfVectorizer().fit(KNOWLEDGE_CHUNKS)
-        print(f"Knowledge base updated. Total chunks: {len(KNOWLEDGE_CHUNKS)}")
+    if KNOWLEDGE_CHUNKS and EMBEDDING_MODEL:
+        # This is the core change: convert all text chunks into numerical vectors
+        KNOWLEDGE_EMBEDDINGS = EMBEDDING_MODEL.encode(KNOWLEDGE_CHUNKS, convert_to_tensor=False)
+        print(f"✅ Knowledge base updated and embeddings generated. Total chunks: {len(KNOWLEDGE_CHUNKS)}")
     else:
-        TFIDF_VECTORIZER = TfidfVectorizer()
-        print("Knowledge base is currently empty.")
+        KNOWLEDGE_EMBEDDINGS = None
+        print("⚠️ Knowledge base is empty or embedding model not loaded.")
 
 def initial_pdf_load():
     """
@@ -73,25 +84,43 @@ def initial_pdf_load():
         print("Warning: No initial text was extracted from PDFs. The knowledge base is empty.")
 
 initial_pdf_load()
-
+# Add this route somewhere before your pm_chat route
+@main_bp.route('/clear-knowledge-base', methods=['POST'])
+def clear_kb():
+    """
+    Clears the global knowledge base.
+    """
+    global KNOWLEDGE_CORPUS, KNOWLEDGE_CHUNKS, KNOWLEDGE_EMBEDDINGS
+    KNOWLEDGE_CORPUS = ""
+    KNOWLEDGE_CHUNKS = []
+    KNOWLEDGE_EMBEDDINGS = None
+    # We don't need to re-run initial_pdf_load. We want it to be empty.
+    print("🧹 Knowledge base cleared by user.")
+    return jsonify({"status": "cleared"})
+# --- MODIFIED: This function now uses embeddings for semantic retrieval ---
 def retrieve_relevant_chunks(user_question, top_k=3):
     """
-    Retrieves the most relevant text chunks from the knowledge base.
+    Retrieves the most relevant text chunks using semantic similarity with embeddings.
     """
-    if not user_question or not KNOWLEDGE_CHUNKS:
+    # Ensure the knowledge base and model are ready
+    if not user_question or KNOWLEDGE_EMBEDDINGS is None or EMBEDDING_MODEL is None:
         return []
     
-    question_vec = TFIDF_VECTORIZER.transform([user_question])
-    chunk_vecs = TFIDF_VECTORIZER.transform(KNOWLEDGE_CHUNKS)
+    # 1. Generate an embedding for the user's question
+    question_embedding = EMBEDDING_MODEL.encode([user_question], convert_to_tensor=False)
     
-    similarities = cosine_similarity(question_vec, chunk_vecs).flatten()
+    # 2. Calculate cosine similarity between the question and all knowledge chunks
+    # The question_embedding needs to be a 2D array for the function, hence [0]
+    similarities = cosine_similarity(question_embedding, KNOWLEDGE_EMBEDDINGS)[0]
     
+    # 3. Find the indices of the top_k most similar chunks
     effective_top_k = min(top_k, len(KNOWLEDGE_CHUNKS))
+    top_indices = np.argsort(similarities)[-effective_top_k:][::-1]
     
-    top_indices = similarities.argsort()[-effective_top_k:][::-1]
+    # 4. Return the actual text chunks corresponding to those indices
     return [KNOWLEDGE_CHUNKS[i] for i in top_indices]
 
-# --- ✨ 2. NEW PDF Upload Route ---
+# --- ✨ 2. NEW PDF Upload Route (No changes needed here) ---
 @main_bp.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
     """
@@ -122,8 +151,7 @@ def upload_pdf():
         print("❌ Upload error:", str(e))
         return jsonify({"error": str(e)}), 500
 
-# --- 3. AI Chain Creation ---
-
+# --- 3. AI Chain Creation (No changes needed here) ---
 def create_chain():
     """Creates and configures the LangChain LLM chain."""
     llm = ChatGoogleGenerativeAI(
@@ -159,8 +187,7 @@ def create_chain():
 **Output Format Example for Project Analysis:**
 
 **Project Overview**
-This is a brief summary of the project. It describes the main goals and objectives in one or two sentences.
-
+These are the risks of the project. 
 **Project Risks**
 1.  **Human:** A potential risk related to the team or stakeholders.
 
@@ -203,6 +230,8 @@ Assistant:
 """
     )
     return LLMChain(llm=llm, prompt=prompt)
+
+# --- (The rest of your code, like sanitize_input, format_response, history, routes, etc., remains unchanged) ---
 
 def sanitize_input(text):
     """Removes potentially unwanted characters from user input."""
@@ -285,6 +314,24 @@ def get_history():
     # send_from_directory is the secure way to send files from a directory
     return send_from_directory(directory=history_dir, path=filename, as_attachment=False)
 
+# This is the helper function from our previous conversation, it's still useful!
+def remove_unwanted_intro(text):
+    """
+    Removes common introductory phrases that comment on the source text.
+    """
+    patterns_to_remove = [
+        r"^\s*The provided text focuses on.*?\n",
+        r"^\s*The provided document discusses.*?\n",
+        r"^\s*Based on the provided context,.*?\n",
+        r"^\s*This document outlines.*?\n",
+    ]
+    
+    cleaned_text = text
+    for pattern in patterns_to_remove:
+        cleaned_text = re.sub(pattern, '', cleaned_text, count=1, flags=re.IGNORECASE).lstrip()
+
+    return cleaned_text
+
 @main_bp.route('/pm-chat', methods=['GET', 'POST'])
 def pm_chat():
     """Handles chat page rendering and AJAX requests, with history persistence."""
@@ -322,8 +369,10 @@ def pm_chat():
                 "retrieved_context": retrieved_context
             })
             ai_response = response.get('text', '').strip() or "I'm not sure how to help with that. Can you rephrase?"
-
-            formatted_ai_response = format_response_for_markdown(ai_response)
+            
+            # We still keep the cleaning step as a safeguard
+            cleaned_ai_response = remove_unwanted_intro(ai_response)
+            formatted_ai_response = format_response_for_markdown(cleaned_ai_response)
 
             session['conversation_history'].append({
                 'role': 'ai', 'content': formatted_ai_response, 'timestamp': datetime.now().isoformat()
